@@ -154,3 +154,5 @@ Temporary Items
 # misc
 logs/
 data/
+out/
+_vizdoom.ini
