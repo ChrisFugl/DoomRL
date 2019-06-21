@@ -26,10 +26,17 @@ def run(config, env):
         flatten_dict_observations=False
     )
     env = VecVideoRecorder(env, config.video_path, _save_video_when, video_length=200)
-    algorithm_args = {'network': 'cnn'}
-    model, _ = learn(env=env, total_timesteps=config.timesteps, **algorithm_args)
+    model, _ = learn(
+        env=env,
+        total_timesteps=config.timesteps,
+        network='cnn',
+        lr=config.learning_rate,
+        gamma=config.discount_factor,
+        # batch size is nsteps * nenv where nenv is number of environment copies simulated in parallel
+        nsteps=config.batch_size,
+    )
     model.save(config.save_path)
 
 
 def _save_video_when(t):
-    return t % 1000000 == 0
+    return t % 100000 == 0
