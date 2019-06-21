@@ -4,7 +4,7 @@ Hi.
 ## Usage
 Use train.py to train stuff.
 
-Important to prefix with `xvfb-run -s "-screen 0 640x480x24"` if running from a server. This can also be done by running `sh train_with_xfvb`.
+Important to prefix with `xvfb-run -s "-screen 0 320x240x24"` if running from a server. This can also be done by running `sh train_with_xfvb`.
 
 Use tensorboard to visualize training:
 

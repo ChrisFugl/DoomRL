@@ -20,23 +20,34 @@ def run(config, env):
     env = make_vec_env(
         config.env,
         config.env,
-        1,  # num_env
+        config.number_of_environments,
         config.seed,
         reward_scale=1.0,
         flatten_dict_observations=False
     )
-    env = VecVideoRecorder(env, config.video_path, _save_video_when, video_length=200)
+    env = VecVideoRecorder(env, config.video_path, _save_video_when(), video_length=200)
     model, _ = learn(
         env=env,
         total_timesteps=config.timesteps,
         network='cnn',
         lr=config.learning_rate,
+        alpha=config.rmsp_decay,
         gamma=config.discount_factor,
         # batch size is nsteps * nenv where nenv is number of environment copies simulated in parallel
-        nsteps=config.batch_size,
+        nsteps=config.batch_size // config.number_of_environments,
+        epsilon=config.rmsp_epsilon
     )
     model.save(config.save_path)
 
 
-def _save_video_when(t):
-    return t % 100000 == 0
+def _save_video_when():
+    next_t = 1
+
+    def _save_when(t):
+        nonlocal next_t
+        if next_t <= t:
+            next_t *= 2
+            return True
+        return False
+
+    return _save_when
