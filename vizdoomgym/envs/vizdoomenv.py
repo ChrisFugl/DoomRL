@@ -29,6 +29,7 @@ class VizdoomEnv(gym.Env):
         self.game.set_window_visible(False)
         self.game.init()
         self.state = None
+        self.skipcount = 4
 
         self.action_space = spaces.Discrete(CONFIGS[level][1])
         self.observation_space = spaces.Box(0, 255, (self.game.get_screen_height(),
@@ -37,6 +38,9 @@ class VizdoomEnv(gym.Env):
                                             dtype=np.uint8)
         self.viewer = None
 
+    def set_skipcount(self, skipcount):
+        self.skipcount = skipcount
+
     def step(self, action):
         # convert action to vizdoom action space (one hot)
         act = np.zeros(self.action_space.n)
@@ -44,7 +48,8 @@ class VizdoomEnv(gym.Env):
         act = np.uint8(act)
         act = act.tolist()
 
-        reward = self.game.make_action(act)
+        reward = self.game.make_action(act, self.skipcount)
+        reward /= 100
         state = self.game.get_state()
         done = self.game.is_episode_finished()
         if not done:
