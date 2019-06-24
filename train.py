@@ -19,6 +19,8 @@ def main():
     algorithm = config.algorithm
     if algorithm == 'baseline_a2c':
         models.run_baseline_a2c(config, env)
+    if algorithm == 'a2c_agent':
+        models.run_a2c_agent(config)
     else:
         raise Exception(f'Unknown algorithm: {algorithm}')
 
