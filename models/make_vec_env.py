@@ -7,6 +7,7 @@ from baselines import logger
 import gym
 import vizdoomgym
 from vizdoomgym.envs.vizdoomenv import VizdoomEnv
+from baselines.common.vec_env.vec_video_recorder import VecVideoRecorder
 
 
 def make_vec_env(config):
@@ -41,3 +42,13 @@ def get_env(config):
     if config.framestacking != 0:
         env = FrameStack(env, config.framestacking)
     return env
+
+def _save_video_when():
+    next_t = 1
+    def _save_when(t):
+        nonlocal next_t
+        if next_t <= t:
+            next_t *= 2
+            return True
+        return False
+    return _save_when

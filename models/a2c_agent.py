@@ -1,3 +1,4 @@
+
 import numpy as np
 import tensorflow as tf
 import os
@@ -115,14 +116,26 @@ class Runner():
 
         self.env = env
         self.model = model
-        nh, nw, nc = env.observation_space.shape
         nenvs = env.num_envs
-        self.batch_ob_shape = (nsteps*nenvs, nh, nw, nc)
+
+        if len(env.observation_space.shape)==1:
+            self.batch_ob_shape = (nsteps*nenvs, env.observation_space.shape[0])
+
+        else:
+            nh, nw, nc = env.observation_space.shape
+            self.batch_ob_shape = (nsteps*nenvs, nh, nw, nc)
+
+
         self.obs = self.env.reset()
         self.gamma = gamma
         self.nsteps = nsteps
         self.states = model.initial_state
         self.dones = [False for _ in range(nenvs)]
+
+        self.n_total_rewards = 40
+        self.rewards_per_env = [[] for _ in range(nenvs)]
+        self.total_rewards = []
+        self.total_rewards_idx = 0
 
     def run(self):
 
@@ -133,6 +146,7 @@ class Runner():
         for n in range(self.nsteps):
             # Given observations, take action and calculate Value (V(s))
             actions, values, states = self.model.step(self.obs)
+
             # append experiences
             mb_obs.append(np.copy(self.obs))
             mb_actions.append(actions)
@@ -146,6 +160,18 @@ class Runner():
             self.dones = dones
             self.obs = obs
 
+            for n, (done, reward) in enumerate(zip(dones, rewards)):
+                self.rewards_per_env[n].append(reward)
+                if done:
+                    # save to total rewards
+                    total_reward = sum(self.rewards_per_env[n])
+                    try:
+                        self.total_rewards[self.total_rewards_idx] = total_reward
+                    except IndexError:
+                        self.total_rewards.append(total_reward)
+                    self.rewards_per_env[n] = []
+                    self.total_rewards_idx = (self.total_rewards_idx + 1) % self.n_total_rewards
+
             #check if episode is over
             for n, done in enumerate(self.dones):
                 if done:
@@ -156,11 +182,12 @@ class Runner():
         mb_dones.append(self.dones)
 
         # convert batch of steps in different environments to batch of rollouts
-        mb_obs = np.asarray(mb_obs, dtype=np.uint8).swapaxes(1, 0).reshape(self.batch_ob_shape)
+        mb_obs = np.asarray(mb_obs, dtype=np.float32).swapaxes(1, 0).reshape(self.batch_ob_shape)
         mb_rewards = np.asarray(mb_rewards, dtype=np.float32).swapaxes(1, 0)
         mb_actions = np.asarray(mb_actions, dtype=np.int32).swapaxes(1, 0)
         mb_values = np.asarray(mb_values, dtype=np.float32).swapaxes(1, 0)
         mb_dones = np.asarray(mb_dones, dtype=np.bool).swapaxes(1, 0)
+
         mb_masks = mb_dones[:, :-1]
         mb_dones = mb_dones[:, 1:]
 
@@ -182,7 +209,7 @@ class Runner():
         mb_values = mb_values.flatten()
         mb_masks = mb_masks.flatten()
 
-        return mb_obs, mb_states, mb_rewards, mb_masks, mb_actions, mb_values
+        return mb_obs, mb_states, mb_rewards, mb_masks, mb_actions, mb_values, self.total_rewards
 
 def learn(env,
           config,
@@ -233,7 +260,7 @@ def learn(env,
         tstart = time.time()
 
         for update in range(1, (config.timesteps // nbatch) + 1):
-            obs, states, rewards, masks, actions, values = runner.run()
+            obs, states, rewards, masks, actions, values, total_rewards = runner.run()
             policy_loss, value_loss, policy_entropy = agent.train(obs, states, rewards, masks, actions, values)
 
             nseconds = time.time() - tstart
@@ -246,7 +273,8 @@ def learn(env,
                 print("{:<15}{:>10}".format("fps", fps))
                 print("{:<15}{:>10.4f}".format("policy_entropy", float(policy_entropy)))
                 print("{:<15}{:>10.4f}".format("value_loss", float(value_loss)))
-                print("{:<15}{:>10.4f}".format("rewards", np.mean(rewards)))
+                # print("{:<15}{:>10.4f}".format("rewards", np.mean(rewards)))
+                print("{:<15}{:>10.4f}".format("rewards", np.mean(total_rewards)))
 
     return agent
 
@@ -254,9 +282,9 @@ def learn(env,
 def train(config):
 
     file_path = os.path.dirname(os.path.realpath(__file__))
-    video_path = os.path.join(file_path, 'video')
+    video_path = os.path.join(file_path, 'video_2')
     env = make_vec_env(config)
-    env = VecVideoRecorder(env, video_path, _save_video_when(), video_length=200)
+    #env = VecVideoRecorder(env, video_path, _save_video_when(), video_length=200)
     learn(env=env, config=config)
 
 
