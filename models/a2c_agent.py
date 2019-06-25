@@ -53,9 +53,10 @@ class A2C:
 
         def train(obs, rewards, masks, actions, values):
             advs = rewards - values
+            vars = [total_loss, actor_loss, critic_loss, entropy, _train]
             feed_dict = {train_net.X: obs, act_ph: actions, adv_ph: advs, rew_ph: rewards}
-            policy_loss, _critic_loss, policy_entropy, _ = self.sess.run([actor_loss, critic_loss, entropy, _train], feed_dict)
-            return policy_loss, _critic_loss, policy_entropy
+            _total_loss, policy_loss, _critic_loss, policy_entropy, _ = self.sess.run(vars, feed_dict)
+            return _total_loss, policy_loss, _critic_loss, policy_entropy
 
         self.train = train
         self.train_net = train_net
@@ -120,21 +121,19 @@ class Runner:
 
             for info in infos:
                 episode = info.get('episode')
-                reward = None if episode is None else episode['r']
-                length = None if episode is None else episode['l']
-                #ammo = info.get('ammo')
-                #health = info.get('health')
-                #kills = info.get('kills')
-                #time_alive = info.get('time_alive')
-                # if reward or length or ammo or health or kills or time_alive:
-                if reward or length:
+                if episode:
                     mb_infos.append({
-                        'reward': reward,
-                        'length': length,
-                        #'ammo': ammo,
-                        #'health': health,
-                        #'kills': kills,
-                        #'time_alive': time_alive,
+                        'reward': episode['r'],
+                        'length': episode['l'],
+                        'ammo_gained': info.get('ammo_gained'),
+                        'ammo_lost': info.get('ammo_lost'),
+                        'health_gained': info.get('health_gained'),
+                        'health_lost': info.get('health_lost'),
+                        'deaths': info.get('deaths'),
+                        'frags': info.get('frags'),
+                        'kills': info.get('kills'),
+                        'hits_given': info.get('hits_given'),
+                        'hits_taken': info.get('hits_taken'),
                     })
 
             self.dones = dones
@@ -193,6 +192,9 @@ class Runner:
 
 def train(config, env):
     log_interval = 100
+    tb_path = os.path.join(config.log_path, 'tb')
+    os.makedirs(tb_path, exist_ok=True)
+    writer = tf.summary.FileWriter(tb_path)
 
     ob_space = env.observation_space
     ac_space = env.action_space
@@ -217,28 +219,60 @@ def train(config, env):
         nupdates = config.timesteps // config.batch_size
         for update in range(1, nupdates + 1):
             obs, rewards, masks, actions, values, infos = runner.run()
-            policy_loss, critic_loss, policy_entropy = agent.train(obs, rewards, masks, actions, values)
+            total_loss, policy_loss, critic_loss, policy_entropy = agent.train(obs, rewards, masks, actions, values)
             info_buffer.extend(infos)
 
+            # write summaries to tensorboard
             if update % log_interval == 0 or update == 1:
+                timestep = update * config.batch_size
                 nseconds = time.time() - tstart
                 fps = int((update * config.batch_size) / nseconds)
+                ammo_lost = [info['ammo_lost'] for info in info_buffer]
+                hits_given = [info['hits_given'] for info in info_buffer]
+                accuracy = list(filter(is_not_none, map(safe_divide, zip(hits_given, ammo_lost))))
 
-                logger.record_tabular('updates', update)
-                logger.record_tabular('timesteps', update * config.batch_size)
-                logger.record_tabular('fps', fps)
-                logger.record_tabular('entropy', policy_entropy)
-                logger.record_tabular('critic_loss', critic_loss)
-                logger.record_tabular('mean_reward', safe_mean([info['reward'] for info in info_buffer]))
-                logger.record_tabular('mean_length', safe_mean([info['length'] for info in info_buffer]))
-                #logger.record_tabular('mean_ammo', safe_mean([info['ammo'] for info in info_buffer]))
-                #logger.record_tabular('mean_health', safe_mean([info['health'] for info in info_buffer]))
-                #logger.record_tabular('mean_kills', safe_mean([info['kills'] for info in info_buffer]))
-                #logger.record_tabular('mean_time_alive', safe_mean([info['time_alive'] for info in info_buffer]))
-                logger.dump_tabular()
+                summary = tf.Summary()
+
+                add_to_summary(summary, 'model', 'fps', fps)
+                add_to_summary(summary, 'model', 'total_loss', total_loss)
+                add_to_summary(summary, 'model', 'critic_loss', critic_loss)
+                add_to_summary(summary, 'model', 'policy_loss', policy_loss)
+                add_to_summary(summary, 'model', 'entropy', policy_entropy)
+
+                add_to_summary(summary, 'episode_means', 'reward', safe_mean([info['reward'] for info in info_buffer]))
+                add_to_summary(summary, 'episode_means', 'length', safe_mean([info['length'] for info in info_buffer]))
+
+                add_to_summary(summary, 'game_variables', 'accuracy', safe_mean(accuracy))
+                add_to_summary(summary, 'game_variables', 'ammo_gained', safe_mean([info['ammo_gained'] for info in info_buffer]))
+                add_to_summary(summary, 'game_variables', 'ammo_lost', safe_mean(ammo_lost))
+                add_to_summary(summary, 'game_variables', 'hits_given', safe_mean(hits_given))
+                add_to_summary(summary, 'game_variables', 'hits_taken', safe_mean([info['hits_taken'] for info in info_buffer]))
+                add_to_summary(summary, 'game_variables', 'health_gained', safe_mean([info['health_gained'] for info in info_buffer]))
+                add_to_summary(summary, 'game_variables', 'health_lost', safe_mean([info['health_lost'] for info in info_buffer]))
+                add_to_summary(summary, 'game_variables', 'deaths', safe_mean([info['deaths'] for info in info_buffer]))
+                add_to_summary(summary, 'game_variables', 'frags', safe_mean([info['frags'] for info in info_buffer]))
+                add_to_summary(summary, 'game_variables', 'kills', safe_mean([info['kills'] for info in info_buffer]))
+
+                writer.add_summary(summary, timestep)
+                writer.flush()
 
         tf_util.save_variables(config.save_path, sess=sess)
 
 
+def is_not_none(x):
+    return x is not None
+
+
+def safe_divide(values):
+    a, b = values
+    if b == 0:
+        return None
+    return a / b
+
+
 def safe_mean(xs):
     return np.nan if len(xs) == 0 else np.mean(xs)
+
+
+def add_to_summary(summary, scope, name, value):
+    summary.value.add(tag=f'{scope}/{name}', simple_value=value)
