@@ -29,17 +29,17 @@ def conv_to_fc(inputs):
 
 
 def sample(logits):
-    noise = tf.random_uniform(tf.shape(logits))
-    return tf.argmax(logits - tf.log(-tf.log(noise)), 1)
+    noise = tf.random_uniform(tf.shape(logits), dtype=logits.dtype)
+    return tf.argmax(logits - tf.log(-tf.log(noise)), -1)
 
 
 class FC:
-    def __init__(self, sess, scope, ob_space, ac_space, reuse=False):
+    def __init__(self, sess, scope, ob_space, ac_space, batch_size, reuse=False):
         #activation function
         activ = tf.nn.relu
 
         #input shapes
-        X = tf.placeholder(tf.float32, [None, ob_space.shape[0]])
+        X = tf.placeholder(tf.float32, [batch_size, ob_space.shape[0]])
         with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
             h1 = fc(X, 32, name='fc1', activ=activ, gain=np.sqrt(2))
             h2 = fc(X, 32, name='fc2', activ=activ, gain=np.sqrt(2))
@@ -54,7 +54,7 @@ class FC:
 
         def step(ob):
             a, v = sess.run([a0, v0], {X: ob})
-            return a, v, []
+            return a, v
 
         def value(ob):
             return sess.run(v0, {X: ob})
@@ -67,12 +67,12 @@ class FC:
 
 
 class CNN:
-    def __init__(self, sess, scope, ob_space, ac_space, reuse=False):
+    def __init__(self, sess, scope, ob_space, ac_space, batch_size, reuse=False):
         #activation function
         activ = tf.nn.relu
 
         nh, nw, nc = ob_space.shape
-        X = tf.placeholder(tf.float32, [None, nh, nw, nc])
+        X = tf.placeholder(tf.float32, [batch_size, nh, nw, nc])
 
         #sclae the images
         scaled_images = tf.cast(X, tf.float32) / 255.
@@ -94,7 +94,7 @@ class CNN:
 
         def step(ob):
             a, v = sess.run([a0, v0], {X: ob})
-            return a, v, []
+            return a, v
 
         def value(ob):
             return sess.run(v0, {X: ob})

@@ -5,6 +5,12 @@ import numpy as np
 import os
 from gym.envs.classic_control import rendering
 
+COLLECT_VARIABLES = [
+    ('ammo', GameVariable.AMMO2),
+    ('health', GameVariable.HEALTH),
+    ('kills', GameVariable.KILLCOUNT),
+]
+
 CONFIGS = [['basic.cfg', 3],                # 0
            ['deadly_corridor.cfg', 7],      # 1
            ['defend_the_center.cfg', 3],    # 2
@@ -57,14 +63,25 @@ class VizdoomEnv(gym.Env):
         else:
             observation = np.uint8(np.zeros(self.observation_space.shape))
 
-        info = {'dummy': 0}
+        #info = {k: self.game.get_game_variable(v) for (k, v) in COLLECT_VARIABLES}
+        #self.info['time_alive'] += 1
+        #self.info['ammo'] = info['ammo']
+        #self.info['health'] = info['health']
+        #self.info['kills'] = info['kills']
 
-        return observation, reward, done, info
+        #return observation, reward, done, self.info.copy()
+        return observation, reward, done, {'dummy': 0}
 
     def reset(self):
         self.game.new_episode()
         self.state = self.game.get_state()
         img = self.state.screen_buffer
+        self.info = {
+            'ammo': 0,
+            'health': 0,
+            'time_alive': 0,
+            'kills': 0,
+        }
         return np.transpose(img, (1, 2, 0))
 
     def render(self, mode='human'):
