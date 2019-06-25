@@ -7,7 +7,11 @@ from gym.envs.classic_control import rendering
 
 COLLECT_VARIABLES = [
     ('ammo', GameVariable.AMMO2),
+    ('dead', GameVariable.DEAD),
+    ('frags', GameVariable.FRAGCOUNT),
     ('health', GameVariable.HEALTH),
+    ('hits_given', GameVariable.HITCOUNT),
+    ('hits_taken', GameVariable.HITS_TAKEN),
     ('kills', GameVariable.KILLCOUNT),
 ]
 
@@ -58,28 +62,54 @@ class VizdoomEnv(gym.Env):
         reward /= 100
         state = self.game.get_state()
         done = self.game.is_episode_finished()
+
+        game_info = {k: self.game.get_game_variable(v) for (k, v) in COLLECT_VARIABLES}
+
+        self.info['frags'] = game_info['frags']
+        self.info['hits_given'] = game_info['hits_given']
+        self.info['hits_taken'] = game_info['hits_taken']
+        self.info['kills'] = game_info['kills']
+
+        ammo_delta = game_info['ammo'] - self.ammo
+        health_delta = game_info['health'] - self.health
+        if ammo_delta < 0:
+            self.info['ammo_lost'] += abs(ammo_delta)
+        else:
+            self.info['ammo_gained'] += ammo_delta
+        if health_delta < 0:
+            self.info['health_lost'] += abs(health_delta)
+        else:
+            self.info['health_gained'] += health_delta
+        if game_info['dead']:
+            self.info['deaths'] += 1
+
+        self.ammo = game_info['ammo']
+        self.health = game_info['health']
+
         if not done:
             observation = np.transpose(state.screen_buffer, (1, 2, 0))
+            info = {}
         else:
             observation = np.uint8(np.zeros(self.observation_space.shape))
+            info = self.info.copy()
 
-        #info = {k: self.game.get_game_variable(v) for (k, v) in COLLECT_VARIABLES}
-        #self.info['time_alive'] += 1
-        #self.info['ammo'] = info['ammo']
-        #self.info['health'] = info['health']
-        #self.info['kills'] = info['kills']
-
-        #return observation, reward, done, self.info.copy()
-        return observation, reward, done, {'dummy': 0}
+        return observation, reward, done, info
 
     def reset(self):
         self.game.new_episode()
         self.state = self.game.get_state()
         img = self.state.screen_buffer
+        self.ammo = self.game.get_game_variable(GameVariable.AMMO2)
+        self.health = self.game.get_game_variable(GameVariable.HEALTH)
         self.info = {
-            'ammo': 0,
-            'health': 0,
-            'time_alive': 0,
+            'ammo_gained': 0,
+            'ammo_lost': 0,
+            'deaths': 0,
+            'frags': 0,
+            'health_gained': 0,
+            'health_lost': 0,
+            'hits_given': 0,
+            'hits_taken': 0,
             'kills': 0,
         }
         return np.transpose(img, (1, 2, 0))
