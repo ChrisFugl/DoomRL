@@ -8,7 +8,6 @@ def run(config, env):
         allow_soft_placement=True,
         intra_op_parallelism_threads=1,
         inter_op_parallelism_threads=1,
-        log_device_placement=True
     )
     session_config.gpu_options.allow_growth = True
     get_session(config=session_config)
