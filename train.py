@@ -16,6 +16,10 @@ def main():
     algorithm = config.algorithm
     if algorithm == 'baseline_a2c':
         models.run_baseline_a2c(config, env)
+    if algorithm == 'baseline_ppo2':
+        if config.number_of_steps<5:
+            print("WARNING: number of steps is very small")
+        models.run_baseline_ppo2(config, env)
     elif algorithm == 'a2c':
         models.run_a2c_agent(config, env)
     else:
@@ -26,9 +30,9 @@ def parse_config():
     parser = configargparse.get_arg_parser()
     parser.add(
         '-a', '--algorithm',
-        choices=['baseline_a2c', 'a2c'],
+        choices=['baseline_a2c', 'a2c', 'baseline_ppo2'],
         required=True,
-        help='Algorithm to use. One of: baseline_a2c.'
+        help='Algorithm to use. One of: baseline_a2c, a2c, baseline_ppo2.'
     )
     parser.add('-e', '--env', required=True, help='Name of Vizdoom. See README for a list of environment names.')
     parser.add('-n', '--name', required=True, help='Name of experiment - used to generate log and output files.')
@@ -36,7 +40,7 @@ def parse_config():
     parser.add('-lr', '--learning_rate', required=False, type=float, default=1e-3, help='Learning rate (default 0.001).')
     parser.add('-s', '--seed', required=False, type=int, default=None, help='Random seed.')
     parser.add('-d', '--discount_factor', required=False, type=float, default=0.99, help='Discount factor (default 0.99).')
-    parser.add('-ns', '--number_of_steps', required=False, type=int, default=5, help='Number of steps in A2C (default 5).')
+    parser.add('-ns', '--number_of_steps', required=False, type=int, default=5, help='Number of steps (default 5).')
     parser.add('-ne', '--number_of_environments', required=False, type=int, default=8, help='Number of environments in A2C (default 8).')
     parser.add('-m', '--momentum', required=False, type=float, default=0.0, help='Optimizer momentum (default 0).')
     parser.add('-rmspd', '--rmsp_decay', required=False, type=float, default=0.99, help='RMSprop decay (default 0.99).')
