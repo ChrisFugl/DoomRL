@@ -1,33 +1,35 @@
-from baselines.common.atari_wrappers import FrameStack
-from baselines.common.retro_wrappers import Downsample, Rgb2gray
 import configargparse
+from environment import make_env
 import gym
 import models
 import numpy as np
 import os
 import random
 import tensorflow as tf
-import vizdoomgym
-from vizdoomgym.envs.vizdoomenv import VizdoomEnv
 
 
 def main():
     config = parse_config()
+    env = make_env(config)
     if config.seed is not None:
         set_seed(config.seed)
     algorithm = config.algorithm
     if algorithm == 'baseline_a2c':
-        env = get_env(config)
         models.run_baseline_a2c(config, env)
-    if algorithm == 'a2c_agent':
-        models.run_a2c_agent(config)
+    elif algorithm == 'a2c':
+        models.run_a2c_agent(config, env)
     else:
         raise Exception(f'Unknown algorithm: {algorithm}')
 
 
 def parse_config():
     parser = configargparse.get_arg_parser()
-    parser.add('-a', '--algorithm', required=True, help='Algorithm to use. One of: baseline_a2c.')
+    parser.add(
+        '-a', '--algorithm',
+        choices=['baseline_a2c', 'a2c'],
+        required=True,
+        help='Algorithm to use. One of: baseline_a2c.'
+    )
     parser.add('-e', '--env', required=True, help='Name of Vizdoom. See README for a list of environment names.')
     parser.add('-n', '--name', required=True, help='Name of experiment - used to generate log and output files.')
     parser.add('-t', '--timesteps', required=False, type=int, default=1000000, help='Number of timesteps (default 1 million)')
@@ -43,7 +45,9 @@ def parse_config():
     parser.add('-dr', '--downscale_ratio', required=False, type=int, default=1.0, help='Down scale ratio (default 1 - no downscaling.)')
     parser.add('-g', '--grayscale', required=False, type=get_bool, default=True, help='Use grayscale (default true).')
     parser.add('-fs', '--framestacking', required=False, type=int, default=0, help='Number of stacked frames (default 0 - do not stack).')
+    parser.add('-sv', '--save_video', required=False, type=get_bool, default=True, help='Save videos while training.')
     args = parser.parse_args()
+    args.number_of_steps = args.batch_size // args.number_of_environments
     file_path = os.path.dirname(os.path.realpath(__file__))
     out_path = os.path.join(file_path, 'out')
     log_path = os.path.join(file_path, 'logs')
@@ -56,34 +60,16 @@ def parse_config():
     args.log_path = os.path.join(log_path, args.name)
     return args
 
-def get_bool(type):
-    if type == "True" or type == "true":
+
+def get_bool(value):
+    if value == "True" or value == "true":
         return True
-    elif type == "False" or type == "false":
+    elif value == "False" or value == "false":
         return False
     try:
-        type == int(type)
-        if type == 1:
-            return True
-        elif type == 0:
-            return False
+        return bool(int(value))
     except ValueError:
-       return False
-
-
-
-def get_env(config):
-    env = gym.make(config.env)
-    if isinstance(env, VizdoomEnv):
-        print('SETTING SKIPCOUNT')
-        env.set_skipcount(config.skipcount)
-    if config.downscale_ratio != 1:
-        env = Downsample(env, config.downscale_ratio)
-    if config.grayscale:
-        env = Rgb2gray(env)
-    if config.framestacking != 0:
-        env = FrameStack(env, config.framestacking)
-    return env
+        return False
 
 
 def set_seed(seed):

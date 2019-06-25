@@ -1,4 +1,4 @@
-
+from baselines.common import tf_util
 import numpy as np
 import tensorflow as tf
 import os
@@ -6,58 +6,62 @@ import random
 import time
 import gym
 import vizdoomgym
-from vizdoomgym.envs.vizdoomenv import VizdoomEnv
-from baselines.common.vec_env.vec_video_recorder import VecVideoRecorder
-from .network import CNN_Net
-from .make_vec_env import make_vec_env
+
+from .network import CNN, FC
+
+
+def find_trainable_variables(scope):
+    with tf.variable_scope(scope):
+        return tf.trainable_variables()
+
+
+def discount_with_dones(rewards, dones, gamma):
+    discounted = []
+    r = 0
+    for reward, done in zip(rewards[::-1], dones[::-1]):
+        r = reward + gamma * r * (1. - done)
+        discounted.append(r)
+    return discounted[::-1]
 
 
 '''
 class used to initialize the sample_net (sampling) and train_net (training)
 '''
-class A2C_Agent():
-    def __init__(self,
-                sess,
-                ob_space,
-                ac_space,
-                nenvs=1,
-                nsteps=5,
-                ent_coef=0.01,
-                vf_coef=0.5,
-                max_grad_norm=0.5,
-                lr=7e-4,
-                alpha=0.99,
-                epsilon=1e-5):
-
+class A2C_Agent:
+    def __init__(self, sess, ob_space, ac_space, config, ent_coef=0.01, vf_coef=0.5, max_grad_norm=0.5):
         self.sess = sess
-        self.learning_rate = lr
+        self.learning_rate = config.learning_rate
 
         act_ph = tf.placeholder(shape=[None], name="act", dtype=tf.int32)
-        adv_ph = tf.placeholder(shape=[None], name="adv", dtype=tf.float32,)
-        rew_ph = tf.placeholder(shape=[None], name="rew", dtype=tf.float32,)
+        adv_ph = tf.placeholder(shape=[None], name="adv", dtype=tf.float32)
+        rew_ph = tf.placeholder(shape=[None], name="rew", dtype=tf.float32)
 
-        sample_net = CNN_Net(sess, "a2c_agent", ob_space, ac_space, reuse=False)
-        train_net = CNN_Net(sess, "a2c_agent", ob_space, ac_space, reuse=True)
+        if len(ob_space.shape) == 1:
+            sample_net = FC(sess, "a2c_agent", ob_space, ac_space, reuse=False)
+            train_net = FC(sess, "a2c_agent", ob_space, ac_space, reuse=True)
+        else:
+            sample_net = CNN(sess, "a2c_agent", ob_space, ac_space, reuse=False)
+            train_net = CNN(sess, "a2c_agent", ob_space, ac_space, reuse=True)
 
-        ### Actor
+        # Actor
         #logprob_actions_ph = self.get_log_prob(train_net.pi, act_ph)
         logprob_actions_ph = -tf.nn.sparse_softmax_cross_entropy_with_logits(logits=train_net.pi, labels=act_ph)
         actor_loss = tf.reduce_mean(-logprob_actions_ph * adv_ph)
         entropy = tf.reduce_mean(self.get_entropy(train_net.pi))
 
-        #### Critic
+        # Critic
         critic_loss = tf.losses.mean_squared_error(tf.squeeze(train_net.vf), rew_ph)
 
-        ### Total
+        # Total
         total_loss = actor_loss - entropy * ent_coef + critic_loss * vf_coef
 
-        ### Update operations
+        # Update operations
         params = tf.trainable_variables("a2c_agent")
         grads = tf.gradients(total_loss, params)
         grads, grad_norm = tf.clip_by_global_norm(grads, max_grad_norm)
         grads = list(zip(grads, params))
 
-        trainer = tf.train.RMSPropOptimizer(learning_rate=self.learning_rate, decay=alpha, epsilon=epsilon)
+        trainer = tf.train.RMSPropOptimizer(learning_rate=self.learning_rate, decay=config.rmsp_decay, epsilon=config.rmsp_epsilon)
         _train = trainer.apply_gradients(grads)
 
         def train(obs, states, rewards, masks, actions, values):
@@ -97,35 +101,34 @@ class A2C_Agent():
         p0 = ea0 / z0
         return tf.reduce_sum(p0 * (tf.log(z0) - a0), 1)
 
+
 '''
 class used to generates a batch of experiences
 '''
-class Runner():
-    def __init__(self, env, model, nsteps=5, gamma=0.99):
+class Runner:
+    def __init__(self, env, model, config):
 
         self.env = env
         self.model = model
-        nenvs = env.num_envs
 
-        if len(env.observation_space.shape)==1:
-            self.batch_ob_shape = (nsteps*nenvs, env.observation_space.shape[0])
+        if len(env.observation_space.shape) == 1:
+            self.batch_ob_shape = (config.batch_size, env.observation_space.shape[0])
         else:
             nh, nw, nc = env.observation_space.shape
-            self.batch_ob_shape = (nsteps*nenvs, nh, nw, nc)
+            self.batch_ob_shape = (config.batch_size, nh, nw, nc)
 
         self.obs = self.env.reset()
-        self.gamma = gamma
-        self.nsteps = nsteps
+        self.gamma = config.discount_factor
+        self.nsteps = config.number_of_steps
         self.states = model.initial_state
-        self.dones = [False for _ in range(nenvs)]
+        self.dones = [False for _ in range(config.number_of_environments)]
 
         self.n_total_rewards = 40
-        self.rewards_per_env = [[] for _ in range(nenvs)]
+        self.rewards_per_env = [[] for _ in range(config.number_of_environments)]
         self.total_rewards = []
         self.total_rewards_idx = 0
 
     def run(self):
-
         mb_obs, mb_rewards, mb_actions, mb_values, mb_dones = [], [], [], [], []
 
         mb_states = self.states
@@ -209,30 +212,17 @@ class Runner():
             discounted.append(r)
         return discounted[::-1]
 
-def learn(env,
-          config,
-          vf_coef=0.5,
-          ent_coef=0.01,
-          max_grad_norm=0.5,
-          epsilon=1e-5,
-          alpha=0.99,
-          gamma=0.99,
-          log_interval=100):
 
-    tf.reset_default_graph()
+def train(config, env):
+    vf_coef = 0.5
+    ent_coef = 0.01
+    max_grad_norm = 0.5
+    log_interval = 100
 
     ob_space = env.observation_space
     ac_space = env.action_space
 
-    seed = config.seed
-    random.seed(seed)
-    np.random.seed(seed)
-    tf.set_random_seed(seed)
-
-    nenvs = env.num_envs
-    nsteps = config.batch_size // config.number_of_environments
-    nbatch = nenvs * nsteps
-
+    tf.reset_default_graph()
 
     gpu_opts = tf.GPUOptions(allow_growth=True)
     tf_config = tf.ConfigProto(
@@ -243,68 +233,36 @@ def learn(env,
 
     with tf.Session(config=tf_config) as sess:
 
-        agent = A2C_Agent(sess=sess,
-                          ob_space=ob_space,
-                          ac_space=ac_space,
-                          lr=config.learning_rate,
-                          ent_coef=ent_coef,
-                          vf_coef=vf_coef,
-                          max_grad_norm=max_grad_norm,
-                          alpha=config.rmsp_decay,
-                          epsilon=config.rmsp_epsilon)
+        agent = A2C_Agent(
+            sess=sess,
+            config=config,
+            ob_space=ob_space,
+            ac_space=ac_space,
+            ent_coef=ent_coef,
+            vf_coef=vf_coef,
+            max_grad_norm=max_grad_norm,
+        )
 
-        runner = Runner(env, agent, nsteps=nsteps, gamma=gamma)
+        runner = Runner(env, agent, config)
 
         #used to calculate fps
         tstart = time.time()
 
-        for update in range(1, (config.timesteps // nbatch) + 1):
+        nupdates = config.timesteps // config.batch_size
+        for update in range(1, nupdates + 1):
             obs, states, rewards, masks, actions, values, total_rewards = runner.run()
             policy_loss, value_loss, policy_entropy = agent.train(obs, states, rewards, masks, actions, values)
 
             nseconds = time.time() - tstart
-            fps = int((update * nbatch) / nseconds)
+            fps = int((update * config.batch_size) / nseconds)
 
             if update % log_interval == 0 or update == 1:
-                print('-'*25)
+                print('-' * 25)
                 print("{:<15}{:>10}".format("updates", update))
-                print("{:<15}{:>10}".format("total_timesteps", update * nbatch))
+                print("{:<15}{:>10}".format("total_timesteps", update * config.batch_size))
                 print("{:<15}{:>10}".format("fps", fps))
                 print("{:<15}{:>10.4f}".format("policy_entropy", float(policy_entropy)))
                 print("{:<15}{:>10.4f}".format("value_loss", float(value_loss)))
-                # print("{:<15}{:>10.4f}".format("rewards", np.mean(rewards)))
                 print("{:<15}{:>10.4f}".format("rewards", np.mean(total_rewards)))
 
-    return agent
-
-
-def train(config):
-
-    file_path = os.path.dirname(os.path.realpath(__file__))
-    video_path = os.path.join(file_path, 'video_2')
-    env = make_vec_env(config)
-    #env = VecVideoRecorder(env, video_path, _save_video_when(), video_length=200)
-    learn(env=env, config=config)
-
-
-def _save_video_when():
-    next_t = 1
-    def _save_when(t):
-        nonlocal next_t
-        if next_t <= t:
-            next_t *= 2
-            return True
-        return False
-    return _save_when
-
-
-# if __name__ == "__main__":
-#     train("VizdoomBasic-v0", nenvs=1, total_timesteps=1e7)
-
-def make_env(rank):
-        def _thunk():
-            env = make_atari(env_id)
-            env.seed(SEED + rank)
-            gym.logger.setLevel(logging.WARN)
-            return wrap_deepmind(env)
-        return _thunk
+        tf_util.save_variables(config.save_path, sess=sess)
