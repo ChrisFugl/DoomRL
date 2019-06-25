@@ -17,7 +17,7 @@ def main():
     if algorithm == 'baseline_a2c':
         models.run_baseline_a2c(config, env)
     if algorithm == 'baseline_ppo2':
-        if config.number_of_steps<5:
+        if config.number_of_steps < 100:
             print("WARNING: number of steps is very small")
         models.run_baseline_ppo2(config, env)
     elif algorithm == 'a2c':
