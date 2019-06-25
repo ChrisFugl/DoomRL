@@ -22,4 +22,4 @@ def run(config, env):
         nsteps=config.batch_size // config.number_of_environments,
         epsilon=config.rmsp_epsilon
     )
-    return model
+    model.save(config.save_path)
