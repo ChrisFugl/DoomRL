@@ -11,17 +11,6 @@ from baselines.common.vec_env.vec_video_recorder import VecVideoRecorder
 from .network import CNN_Net
 from .make_vec_env import make_vec_env
 
-def find_trainable_variables(scope):
-    with tf.variable_scope(scope):
-        return tf.trainable_variables()
-
-def discount_with_dones(rewards, dones, gamma):
-    discounted = []
-    r = 0
-    for reward, done in zip(rewards[::-1], dones[::-1]):
-        r = reward + gamma * r * (1. - done)
-        discounted.append(r)
-    return discounted[::-1]
 
 '''
 class used to initialize the sample_net (sampling) and train_net (training)
@@ -51,22 +40,23 @@ class A2C_Agent():
         train_net = CNN_Net(sess, "a2c_agent", ob_space, ac_space, reuse=True)
 
         ### Actor
-        logprob_actions_ph = self.get_log_prob(train_net.pi, act_ph)
+        #logprob_actions_ph = self.get_log_prob(train_net.pi, act_ph)
+        logprob_actions_ph = -tf.nn.sparse_softmax_cross_entropy_with_logits(logits=train_net.pi, labels=act_ph)
         actor_loss = tf.reduce_mean(-logprob_actions_ph * adv_ph)
         entropy = tf.reduce_mean(self.get_entropy(train_net.pi))
 
         #### Critic
-        critic_loss = tf.reduce_mean(tf.squared_difference(tf.squeeze(train_net.vf), rew_ph) / 2.0)
+        critic_loss = tf.losses.mean_squared_error(tf.squeeze(train_net.vf), rew_ph)
 
         ### Total
         total_loss = actor_loss - entropy * ent_coef + critic_loss * vf_coef
 
-        ### Training operations
-        params = find_trainable_variables("a2c_agent")
+        ### Update operations
+        params = tf.trainable_variables("a2c_agent")
         grads = tf.gradients(total_loss, params)
-        if max_grad_norm is not None:
-            grads, grad_norm = tf.clip_by_global_norm(grads, max_grad_norm)
+        grads, grad_norm = tf.clip_by_global_norm(grads, max_grad_norm)
         grads = list(zip(grads, params))
+
         trainer = tf.train.RMSPropOptimizer(learning_rate=self.learning_rate, decay=alpha, epsilon=epsilon)
         _train = trainer.apply_gradients(grads)
 
@@ -107,7 +97,6 @@ class A2C_Agent():
         p0 = ea0 / z0
         return tf.reduce_sum(p0 * (tf.log(z0) - a0), 1)
 
-
 '''
 class used to generates a batch of experiences
 '''
@@ -120,11 +109,9 @@ class Runner():
 
         if len(env.observation_space.shape)==1:
             self.batch_ob_shape = (nsteps*nenvs, env.observation_space.shape[0])
-
         else:
             nh, nw, nc = env.observation_space.shape
             self.batch_ob_shape = (nsteps*nenvs, nh, nw, nc)
-
 
         self.obs = self.env.reset()
         self.gamma = gamma
@@ -160,6 +147,7 @@ class Runner():
             self.dones = dones
             self.obs = obs
 
+            #get total rewards
             for n, (done, reward) in enumerate(zip(dones, rewards)):
                 self.rewards_per_env[n].append(reward)
                 if done:
@@ -182,6 +170,8 @@ class Runner():
         mb_dones.append(self.dones)
 
         # convert batch of steps in different environments to batch of rollouts
+        # from shape (steps, envs) to (envs, steps)
+
         mb_obs = np.asarray(mb_obs, dtype=np.float32).swapaxes(1, 0).reshape(self.batch_ob_shape)
         mb_rewards = np.asarray(mb_rewards, dtype=np.float32).swapaxes(1, 0)
         mb_actions = np.asarray(mb_actions, dtype=np.int32).swapaxes(1, 0)
@@ -191,7 +181,7 @@ class Runner():
         mb_masks = mb_dones[:, :-1]
         mb_dones = mb_dones[:, 1:]
 
-        #get values
+        #get last values
         last_values = self.model.value(self.obs).tolist()
 
         # discount
@@ -199,9 +189,9 @@ class Runner():
             rewards = rewards.tolist()
             dones = dones.tolist()
             if dones[-1] == 0:
-                rewards = discount_with_dones(rewards + [value], dones + [0], self.gamma)[:-1]
+                rewards = self.discount_with_dones(rewards + [value], dones + [0], self.gamma)[:-1]
             else:
-                rewards = discount_with_dones(rewards, dones, self.gamma)
+                rewards = self.discount_with_dones(rewards, dones, self.gamma)
             mb_rewards[n] = rewards
 
         mb_rewards = mb_rewards.flatten()
@@ -210,6 +200,14 @@ class Runner():
         mb_masks = mb_masks.flatten()
 
         return mb_obs, mb_states, mb_rewards, mb_masks, mb_actions, mb_values, self.total_rewards
+
+    def discount_with_dones(self, rewards, dones, gamma):
+        discounted = []
+        r = 0
+        for reward, done in zip(rewards[::-1], dones[::-1]):
+            r = reward + gamma * r * (1. - done)
+            discounted.append(r)
+        return discounted[::-1]
 
 def learn(env,
           config,
@@ -223,6 +221,9 @@ def learn(env,
 
     tf.reset_default_graph()
 
+    ob_space = env.observation_space
+    ac_space = env.action_space
+
     seed = config.seed
     random.seed(seed)
     np.random.seed(seed)
@@ -232,8 +233,6 @@ def learn(env,
     nsteps = config.batch_size // config.number_of_environments
     nbatch = nenvs * nsteps
 
-    ob_space = env.observation_space
-    ac_space = env.action_space
 
     gpu_opts = tf.GPUOptions(allow_growth=True)
     tf_config = tf.ConfigProto(
@@ -301,3 +300,11 @@ def _save_video_when():
 
 # if __name__ == "__main__":
 #     train("VizdoomBasic-v0", nenvs=1, total_timesteps=1e7)
+
+def make_env(rank):
+        def _thunk():
+            env = make_atari(env_id)
+            env.seed(SEED + rank)
+            gym.logger.setLevel(logging.WARN)
+            return wrap_deepmind(env)
+        return _thunk

@@ -31,7 +31,6 @@ class CNN_Net():
         activ = tf.nn.relu
 
         #input shapes
-        print(ob_space.shape)
         if len(ob_space.shape)==1:
             X = tf.placeholder(tf.float32, [None, ob_space.shape[0]])
 

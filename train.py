@@ -13,11 +13,11 @@ from vizdoomgym.envs.vizdoomenv import VizdoomEnv
 
 def main():
     config = parse_config()
-    env = get_env(config)
     if config.seed is not None:
         set_seed(config.seed)
     algorithm = config.algorithm
     if algorithm == 'baseline_a2c':
+        env = get_env(config)
         models.run_baseline_a2c(config, env)
     if algorithm == 'a2c_agent':
         models.run_a2c_agent(config)
@@ -41,7 +41,7 @@ def parse_config():
     parser.add('-rmspe', '--rmsp_epsilon', required=False, type=float, default=1e-10, help='RMSprop epsilon (default 1e-10).')
     parser.add('-sc', '--skipcount', required=False, type=int, default=0, help='Number of frames to skip (default 0).')
     parser.add('-dr', '--downscale_ratio', required=False, type=int, default=1.0, help='Down scale ratio (default 1 - no downscaling.)')
-    parser.add('-g', '--grayscale', required=False, type=bool, default=True, help='Use grayscale (default true).')
+    parser.add('-g', '--grayscale', required=False, type=get_bool, default=True, help='Use grayscale (default true).')
     parser.add('-fs', '--framestacking', required=False, type=int, default=0, help='Number of stacked frames (default 0 - do not stack).')
     args = parser.parse_args()
     file_path = os.path.dirname(os.path.realpath(__file__))
@@ -55,6 +55,21 @@ def parse_config():
     args.video_path = os.path.join(out_path, args.name)
     args.log_path = os.path.join(log_path, args.name)
     return args
+
+def get_bool(type):
+    if type == "True" or type == "true":
+        return True
+    elif type == "False" or type == "false":
+        return False
+    try:
+        type == int(type)
+        if type == 1:
+            return True
+        elif type == 0:
+            return False
+    except ValueError:
+       return False
+
 
 
 def get_env(config):
