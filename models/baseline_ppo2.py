@@ -24,7 +24,7 @@ def run(config, env):
         nsteps=config.number_of_steps,
         eval_env = None,
         lam=0.95,
-        log_interval=2,
+        log_interval=6,
         nminibatches=4,
         noptepochs=4,
         cliprange=0.2,
