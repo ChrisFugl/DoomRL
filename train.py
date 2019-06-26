@@ -1,5 +1,5 @@
 import configargparse
-from environment import make_env
+from environment import make_train_env
 import gym
 import models
 import numpy as np
@@ -10,18 +10,18 @@ import tensorflow as tf
 
 def main():
     config = parse_config()
-    env = make_env(config)
+    env = make_train_env(config)
     if config.seed is not None:
         set_seed(config.seed)
     algorithm = config.algorithm
     if algorithm == 'baseline_a2c':
-        models.run_baseline_a2c(config, env)
-    if algorithm == 'baseline_ppo2':
+        models.baseline_a2c.train(config, env)
+    elif algorithm == 'baseline_ppo2':
         if config.number_of_steps < 100:
             print("WARNING: number of steps is very small")
-        models.run_baseline_ppo2(config, env)
+        models.baseline_ppo2.train(config, env)
     elif algorithm == 'a2c':
-        models.run_a2c(config, env)
+        models.a2c.train(config, env)
     else:
         raise Exception(f'Unknown algorithm: {algorithm}')
 
@@ -34,7 +34,7 @@ def parse_config():
         required=True,
         help='Algorithm to use. One of: baseline_a2c, a2c, baseline_ppo2.'
     )
-    parser.add('-e', '--env', required=True, help='Name of Vizdoom. See README for a list of environment names.')
+    parser.add('-e', '--env', required=True, help='Name of Vizdoom environment. See README for a list of environment names.')
     parser.add('-n', '--name', required=True, help='Name of experiment - used to generate log and output files.')
     parser.add('-t', '--timesteps', required=False, type=int, default=1000000, help='Number of timesteps (default 1 million)')
     parser.add('-lr', '--learning_rate', required=False, type=float, default=1e-3, help='Learning rate (default 0.001).')
@@ -56,7 +56,7 @@ def parse_config():
     parser.add(
         '-sm',
         '--sampling_method',
-        choices=['noise', 'categorical', 'epsilon'],
+        choices=['noise', 'categorical', 'epsilon', 'max'],
         required=False,
         default='noise',
         help='Method used for sampling (default noise).'
@@ -67,10 +67,8 @@ def parse_config():
     file_path = os.path.dirname(os.path.realpath(__file__))
     out_path = os.path.join(file_path, 'out')
     log_path = os.path.join(file_path, 'logs')
-    if not os.path.exists(out_path):
-        os.makedirs(out_path)
-    if not os.path.exists(log_path):
-        os.makedirs(log_path)
+    os.makedirs(out_path, exist_ok=True)
+    os.makedirs(log_path, exist_ok=True)
     args.save_path = os.path.join(out_path, args.name, 'model')
     args.video_path = os.path.join(out_path, args.name)
     args.log_path = os.path.join(log_path, args.name)

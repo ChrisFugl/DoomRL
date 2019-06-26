@@ -51,13 +51,19 @@ def sample_epsilon_greedy(epsilon, nactions, batch_size):
     return sample
 
 
+def sample_max(logits):
+    return tf.argmax(logits, -1)
+
+
 def get_sampler(config, ac_space, batch_size):
     if config.sampling_method == 'noise':
         return sample_noise
     elif config.sampling_method == 'categorical':
         return sample_categorical
-    else:
+    elif config.sampling_method == 'epsilon':
         return sample_epsilon_greedy(config.epsilon, ac_space.n, batch_size)
+    else:
+        return sample_max
 
 
 class FC:

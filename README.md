@@ -1,18 +1,31 @@
 # DoomRL
-Hi.
+Deep reinforcement learning algorithms in a Doom environment based on [OpenAI baselines](https://github.com/openai/baselines).
 
 ## Usage
-Use train.py to train stuff.
+Use train.py to train a model.
 
-Important to prefix with `xvfb-run -s "-screen 0 320x240x24"` if running from a server. This can also be done by running `sh train_with_xfvb`.
+```
+python3 train.py -a a2c -e VizdoomBasic-v0 -n my_model
+```
 
-Use tensorboard to visualize training:
+Enter `python3 train.py --help` to get a list of available parameters for training. The environment requires the presence of a screen. This may be an issue if you are running this on a server. In this case you should train using `sh train_with_xfvb.sh` instead of `python3 train.py`.
 
+Logs are automatically written to the `logs` directory and can be visualized using tensorboard.
 ```
 tensorboard --logdir logs
 ```
 
-### Environments
+Once a model has finished training, you can test its performance using `test.py` which generates a number of rollouts and can be configured to save a video of each rollout.
+
+```
+python3 test.py -a a2c -e VizdoomBasic-v0 -n my_model -o path/to/performance/results
+```
+
+Enter `python3 test.py --help` to get a list of available parameters for testing. Similar to training, use `sh test_with_xvfb.sh` if you do not have access to a physical screen.
+
+### Scenarios
+The following doom scenarios are available. A description of each scenario can be seen on [this page](https://github.com/shakenes/vizdoomgym/blob/master/vizdoomgym/envs/scenarios/README.md).
+
 ```
 VizdoomBasic-v0
 VizdoomCorridor-v0
@@ -33,11 +46,8 @@ Python 3.6 and see requirements.txt.
 pip3 install --user -r requirements.txt
 ```
 
-Install baselines.
-https://github.com/openai/baselines
-
-Vizdoom.
-See this page for installation instructions: https://github.com/mwydmuch/ViZDoom/blob/master/doc/Building.md#pypi
+Install [baselines](https://github.com/openai/baselines).
+Install Vizdoom. See [this page](https://github.com/mwydmuch/ViZDoom/blob/master/doc/Building.md#pypi) for installation instructions.
 
 ## Acknowledgements
-Code in vizdoomgym directory is a slight modification of the work in https://github.com/shakenes/vizdoomgym by Simon Hakenes.
+Models are based on implementations by [OpenAI baselines](https://github.com/openai/baselines). Code in vizdoomgym directory is based of of the work in https://github.com/shakenes/vizdoomgym by Simon Hakenes.
