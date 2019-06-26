@@ -1,4 +1,5 @@
 import numpy as np
+import random
 import tensorflow as tf
 
 
@@ -28,13 +29,41 @@ def conv_to_fc(inputs):
     return tf.layers.flatten(inputs)
 
 
-def sample(logits):
+def sample_categorical(logits):
+    distribution = tf.distributions.Categorical(logits=logits)
+    return distribution.sample()
+
+
+def sample_noise(logits):
     noise = tf.random_uniform(tf.shape(logits), dtype=logits.dtype)
     return tf.argmax(logits - tf.log(-tf.log(noise)), -1)
 
 
+def sample_epsilon_greedy(epsilon, nactions, batch_size):
+    shape = tf.constant([batch_size], dtype=tf.int32)
+
+    def sample(logits):
+        if random.random() < epsilon:
+            return tf.random.uniform(shape=shape, minval=0, maxval=nactions, dtype=tf.int32)
+        else:
+            return tf.argmax(logits, -1)
+
+    return sample
+
+
+def get_sampler(config, ac_space, batch_size):
+    if config.sampling_method == 'noise':
+        return sample_noise
+    elif config.sampling_method == 'categorical':
+        return sample_categorical
+    else:
+        return sample_epsilon_greedy(config.epsilon, ac_space.n, batch_size)
+
+
 class FC:
-    def __init__(self, sess, scope, ob_space, ac_space, batch_size, reuse=False):
+    def __init__(self, sess, scope, ob_space, ac_space, batch_size, config, reuse=False):
+        sample = get_sampler(config, ac_space, batch_size)
+
         #activation function
         activ = tf.nn.relu
 
@@ -67,7 +96,9 @@ class FC:
 
 
 class CNN:
-    def __init__(self, sess, scope, ob_space, ac_space, batch_size, reuse=False):
+    def __init__(self, sess, scope, ob_space, ac_space, batch_size, config, reuse=False):
+        sample = get_sampler(config, ac_space, batch_size)
+
         #activation function
         activ = tf.nn.relu
 

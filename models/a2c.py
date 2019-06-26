@@ -24,11 +24,11 @@ class A2C:
         rew_ph = tf.placeholder(shape=[None], name='rew', dtype=tf.float32)
 
         if len(ob_space.shape) == 1:
-            sample_net = FC(sess, 'a2c_agent', ob_space, ac_space, config.number_of_environments, reuse=False)
-            train_net = FC(sess, 'a2c_agent', ob_space, ac_space, config.batch_size, reuse=True)
+            sample_net = FC(sess, 'a2c_agent', ob_space, ac_space, config.number_of_environments, config, reuse=False)
+            train_net = FC(sess, 'a2c_agent', ob_space, ac_space, config.batch_size, config, reuse=True)
         else:
-            sample_net = CNN(sess, 'a2c_agent', ob_space, ac_space, config.number_of_environments, reuse=False)
-            train_net = CNN(sess, 'a2c_agent', ob_space, ac_space, config.batch_size, reuse=True)
+            sample_net = CNN(sess, 'a2c_agent', ob_space, ac_space, config.number_of_environments, config, reuse=False)
+            train_net = CNN(sess, 'a2c_agent', ob_space, ac_space, config.batch_size, config, reuse=True)
 
         # Actor
         neglogprob = self.get_neglog_prob(train_net.pi, act_ph)

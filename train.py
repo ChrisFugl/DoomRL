@@ -21,7 +21,7 @@ def main():
             print("WARNING: number of steps is very small")
         models.run_baseline_ppo2(config, env)
     elif algorithm == 'a2c':
-        models.run_a2c_agent(config, env)
+        models.run_a2c(config, env)
     else:
         raise Exception(f'Unknown algorithm: {algorithm}')
 
@@ -53,6 +53,15 @@ def parse_config():
     parser.add('-ew', '--entropy_weight', required=False, type=float, default=0.01, help='Weight of entropy (default 0.01).')
     parser.add('-cw', '--critic_weight', required=False, type=float, default=0.5, help='Wegith of critic loss (default 0.5).')
     parser.add('-mgn', '--max_grad_norm', required=False, type=float, default=None, help='Clips gradients at this norm or higher (default no clipping).')
+    parser.add(
+        '-sm',
+        '--sampling_method',
+        choices=['noise', 'categorical', 'epsilon'],
+        required=False,
+        default='noise',
+        help='Method used for sampling (default noise).'
+    )
+    parser.add('-ep', '--epsilon', required=False, type=float, default=0.1, help='Epsilon in greedy epsilon sampling (default 0.1).')
     args = parser.parse_args()
     args.batch_size = args.number_of_steps * args.number_of_environments
     file_path = os.path.dirname(os.path.realpath(__file__))
