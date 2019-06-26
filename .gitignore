@@ -158,3 +158,4 @@ out/
 _vizdoom.ini
 jobs/
 models/video/
+rollouts/

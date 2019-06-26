@@ -1,13 +1,13 @@
 from baselines import logger
 from baselines.common import tf_util
 from collections import deque
+from models.network import CNN, FC
+from models.utils import make_rollouts, is_not_none, safe_divide, safe_mean
 import numpy as np
 import os
 import random
 import tensorflow as tf
 import time
-
-from .network import CNN, FC
 
 
 '''
@@ -19,9 +19,9 @@ class A2C:
         self.learning_rate = config.learning_rate
         self.ac_space = ac_space
 
-        act_ph = tf.placeholder(shape=[None], name='act', dtype=tf.int32)
-        adv_ph = tf.placeholder(shape=[None], name='adv', dtype=tf.float32)
-        rew_ph = tf.placeholder(shape=[None], name='rew', dtype=tf.float32)
+        act_ph = tf.placeholder(shape=[config.batch_size], name='act', dtype=tf.int32)
+        adv_ph = tf.placeholder(shape=[config.batch_size], name='adv', dtype=tf.float32)
+        rew_ph = tf.placeholder(shape=[config.batch_size], name='rew', dtype=tf.float32)
 
         if len(ob_space.shape) == 1:
             sample_net = FC(sess, 'a2c_agent', ob_space, ac_space, config.number_of_environments, config, reuse=False)
@@ -36,7 +36,7 @@ class A2C:
         entropy = tf.reduce_mean(self.get_entropy(train_net.pi))
 
         # Critic
-        critic_loss = tf.losses.mean_squared_error(tf.squeeze(train_net.vf), rew_ph)
+        critic_loss = tf.losses.mean_squared_error(tf.squeeze(train_net.vf), tf.squeeze(rew_ph))
 
         # Total
         total_loss = actor_loss - entropy * config.entropy_weight + critic_loss * config.critic_weight
@@ -190,6 +190,23 @@ class Runner:
         return discounted[::-1]
 
 
+def test(config, env):
+    ob_space = env.observation_space
+    ac_space = env.action_space
+    tf.reset_default_graph()
+    gpu_opts = tf.GPUOptions(allow_growth=True)
+    tf_config = tf.ConfigProto(
+        inter_op_parallelism_threads=1,
+        intra_op_parallelism_threads=1,
+        gpu_options=gpu_opts,
+    )
+    with tf.Session(config=tf_config) as sess:
+        agent = A2C(sess=sess, config=config, ob_space=ob_space, ac_space=ac_space)
+        runner = Runner(env, agent, config)
+        tf_util.load_variables(config.load_path, sess=sess)
+        return make_rollouts(config, env, agent)
+
+
 def train(config, env):
     log_interval = 100
     tb_path = os.path.join(config.log_path, 'tb')
@@ -257,21 +274,6 @@ def train(config, env):
                 writer.flush()
 
         tf_util.save_variables(config.save_path, sess=sess)
-
-
-def is_not_none(x):
-    return x is not None
-
-
-def safe_divide(values):
-    a, b = values
-    if b == 0:
-        return None
-    return a / b
-
-
-def safe_mean(xs):
-    return np.nan if len(xs) == 0 else np.mean(xs)
 
 
 def add_to_summary(summary, scope, name, value):
