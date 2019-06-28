@@ -40,14 +40,15 @@ VizdoomHealthGatheringSupreme-v0
 ```
 
 ## Requirements
-Python 3.6 and see requirements.txt.
+Python 3.6+.
 
 ```
 pip3 install --user -r requirements.txt
 ```
 
 Install [baselines](https://github.com/openai/baselines).
+
 Install Vizdoom. See [this page](https://github.com/mwydmuch/ViZDoom/blob/master/doc/Building.md#pypi) for installation instructions.
 
 ## Acknowledgements
-Models are based on implementations by [OpenAI baselines](https://github.com/openai/baselines). Code in vizdoomgym directory is based of of the work in https://github.com/shakenes/vizdoomgym by Simon Hakenes.
+Models are based on implementations by [OpenAI baselines](https://github.com/openai/baselines). Code in vizdoomgym directory is based of the work in https://github.com/shakenes/vizdoomgym by Simon Hakenes.

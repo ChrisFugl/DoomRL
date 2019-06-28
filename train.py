@@ -15,15 +15,16 @@ def main():
         set_seed(config.seed)
     algorithm = config.algorithm
     if algorithm == 'baseline_a2c':
-        models.baseline_a2c.train(config, env)
+        from models.baselines.a2c import train
     elif algorithm == 'baseline_ppo2':
         if config.number_of_steps < 100:
             print("WARNING: number of steps is very small")
-        models.baseline_ppo2.train(config, env)
+        from models.baselines.ppo2 import train
     elif algorithm == 'a2c':
-        models.a2c.train(config, env)
+        from models.a2c import train
     else:
         raise Exception(f'Unknown algorithm: {algorithm}')
+    train(config, env)
 
 
 def parse_config():

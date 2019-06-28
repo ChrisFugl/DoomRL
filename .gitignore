@@ -159,3 +159,4 @@ _vizdoom.ini
 jobs/
 models/video/
 rollouts/
+sync.sh

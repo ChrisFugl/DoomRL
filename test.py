@@ -15,13 +15,14 @@ def main():
         set_seed(config.seed)
     algorithm = config.algorithm
     if algorithm == 'baseline_a2c':
-        rollouts = models.baseline_a2c.test(config, env)
+        from models.baselines.a2c import test
     elif algorithm == 'baseline_ppo2':
-        rollouts = models.baseline_ppo2.test(config, env)
+        from models.baselines.ppo2 import test
     elif algorithm == 'a2c':
-        rollouts = models.a2c.test(config, env)
+        from models.a2c import test
     else:
         raise Exception(f'Unknown algorithm: {algorithm}')
+    rollouts = test(config, env)
     save_path = os.path.join(config.out, 'rollouts.csv')
     rollouts.to_csv(save_path, index=None)
 
