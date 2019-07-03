@@ -60,7 +60,7 @@ def parse_train_config():
     parser.add('-e', '--env', required=True, help='Name of Vizdoom environment. See README for a list of environment names.')
     parser.add('-n', '--name', required=True, help='Name of experiment - used to generate log and output files.')
     parser.add('-t', '--timesteps', required=False, type=int, default=1000000, help='Number of timesteps (default 1 million)')
-    parser.add('-lr', '--learning_rate', required=False, type=float, default=1e-3, help='Learning rate (default 0.001).')
+    parser.add('-lr', '--learning_rate', required=False, type=float, default=1e-4, help='Learning rate (default 0.0001).')
     parser.add('-s', '--seed', required=False, type=int, default=None, help='Random seed.')
     parser.add('-d', '--discount_factor', required=False, type=float, default=0.99, help='Discount factor (default 0.99).')
     parser.add('-ns', '--number_of_steps', required=False, type=int, default=5, help='Number of steps (default 5).')

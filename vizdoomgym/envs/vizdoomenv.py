@@ -6,7 +6,6 @@ import os
 from gym.envs.classic_control import rendering
 
 COLLECT_VARIABLES = [
-    ('ammo', GameVariable.AMMO2),
     ('dead', GameVariable.DEAD),
     ('frags', GameVariable.FRAGCOUNT),
     ('health', GameVariable.HEALTH),
@@ -69,7 +68,8 @@ class VizdoomEnv(gym.Env):
         self.info['hits_taken'] = game_info['hits_taken']
         self.info['kills'] = game_info['kills']
 
-        ammo_delta = game_info['ammo'] - self.ammo
+        ammo = self._get_total_ammo()
+        ammo_delta = ammo - self.ammo
         health_delta = game_info['health'] - self.health
         if ammo_delta < 0:
             self.info['ammo_lost'] += abs(ammo_delta)
@@ -82,7 +82,7 @@ class VizdoomEnv(gym.Env):
         if game_info['dead']:
             self.info['deaths'] += 1
 
-        self.ammo = game_info['ammo']
+        self.ammo = ammo
         self.health = game_info['health']
 
         if not done:
@@ -98,7 +98,7 @@ class VizdoomEnv(gym.Env):
         self.game.new_episode()
         self.state = self.game.get_state()
         img = self.state.screen_buffer
-        self.ammo = self.game.get_game_variable(GameVariable.AMMO2)
+        self.ammo = self._get_total_ammo()
         self.health = self.game.get_game_variable(GameVariable.HEALTH)
         self.info = {
             'ammo_gained': 0,
@@ -136,3 +136,15 @@ class VizdoomEnv(gym.Env):
                 (ord('q'),): 5,
                 (ord('e'),): 6}
         return keys
+
+    def _get_total_ammo(self):
+        return self.game.get_game_variable(GameVariable.AMMO0) \
+            + self.game.get_game_variable(GameVariable.AMMO1) \
+            + self.game.get_game_variable(GameVariable.AMMO2) \
+            + self.game.get_game_variable(GameVariable.AMMO3) \
+            + self.game.get_game_variable(GameVariable.AMMO4) \
+            + self.game.get_game_variable(GameVariable.AMMO5) \
+            + self.game.get_game_variable(GameVariable.AMMO6) \
+            + self.game.get_game_variable(GameVariable.AMMO7) \
+            + self.game.get_game_variable(GameVariable.AMMO8) \
+            + self.game.get_game_variable(GameVariable.AMMO9)
