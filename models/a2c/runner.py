@@ -9,13 +9,8 @@ class Runner:
 
         self.env = env
         self.model = model
-
-        if len(env.observation_space.shape) == 1:
-            self.batch_ob_shape = (config.batch_size, env.observation_space.shape[0])
-        else:
-            nh, nw, nc = env.observation_space.shape
-            self.batch_ob_shape = (config.batch_size, nh, nw, nc)
-
+        nh, nw, nc = env.observation_space.shape
+        self.batch_ob_shape = (config.batch_size, nh, nw, nc)
         self.obs = self.env.reset()
         self.gamma = config.discount_factor
         self.nsteps = config.number_of_steps
@@ -68,7 +63,6 @@ class Runner:
 
         # convert batch of steps in different environments to batch of rollouts
         # from shape (steps, envs) to (envs, steps)
-
         mb_obs = np.asarray(mb_obs, dtype=np.float32).swapaxes(1, 0).reshape(self.batch_ob_shape)
         mb_rewards = np.asarray(mb_rewards, dtype=np.float32).swapaxes(1, 0)
         mb_actions = np.asarray(mb_actions, dtype=np.int32).swapaxes(1, 0)

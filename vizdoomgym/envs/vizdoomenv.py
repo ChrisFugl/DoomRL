@@ -59,7 +59,6 @@ class VizdoomEnv(gym.Env):
         act = act.tolist()
 
         reward = self.game.make_action(act, self.skipcount)
-        reward /= 100
         state = self.game.get_state()
         done = self.game.is_episode_finished()
 

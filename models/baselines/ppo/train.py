@@ -3,7 +3,7 @@ from baselines.ppo2.ppo2 import learn
 import tensorflow as tf
 
 
-def train(config, env):
+def train(config, env, logger):
     session_config = tf.ConfigProto(
         allow_soft_placement=True,
         intra_op_parallelism_threads=1,
@@ -23,11 +23,11 @@ def train(config, env):
         gamma=config.discount_factor,
         nsteps=config.number_of_steps,
         eval_env=None,
-        lam=0.95,
-        log_interval=6,
-        nminibatches=4,
-        noptepochs=4,
-        cliprange=0.2,
+        lam=config.gae_lambda,
+        log_interval=config.log_every,
+        nminibatches=config.batch_size // config.mini_batch_size,
+        noptepochs=config.epochs,
+        cliprange=config.clip_epsilon,
         save_interval=0,
         load_path=None,
         model_fn=None,

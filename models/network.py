@@ -1,3 +1,4 @@
+from models.utils import categorical_neg_log_p
 import numpy as np
 import random
 import tensorflow as tf
@@ -36,7 +37,7 @@ def sample_categorical(logits):
 
 def sample_noise(logits):
     noise = tf.random_uniform(tf.shape(logits), dtype=logits.dtype)
-    return tf.argmax(logits - tf.log(-tf.log(noise)), -1)
+    return tf.argmax(logits - tf.log(-tf.log(noise)), axis=-1)
 
 
 def sample_epsilon_greedy(epsilon, nactions, batch_size):
@@ -46,13 +47,13 @@ def sample_epsilon_greedy(epsilon, nactions, batch_size):
         if random.random() < epsilon:
             return tf.random.uniform(shape=shape, minval=0, maxval=nactions, dtype=tf.int32)
         else:
-            return tf.argmax(logits, -1)
+            return tf.argmax(logits, axis=-1)
 
     return sample
 
 
 def sample_max(logits):
-    return tf.argmax(logits, -1)
+    return tf.argmax(logits, axis=-1)
 
 
 def get_sampler(config, ac_space, batch_size):
@@ -67,7 +68,7 @@ def get_sampler(config, ac_space, batch_size):
 
 
 class FC:
-    def __init__(self, sess, scope, ob_space, ac_space, batch_size, config, reuse=False):
+    def __init__(self, sess, scope, ob_space, ac_space, batch_size, config):
         sample = get_sampler(config, ac_space, batch_size)
 
         #activation function
@@ -86,6 +87,7 @@ class FC:
 
         # sampe an action given the policy
         a0 = sample(pi)
+        neg_log_p = categorical_neg_log_p(pi, a0, ac_space.n)
 
         def step(ob):
             a, v = sess.run([a0, v0], {X: ob})
@@ -94,7 +96,10 @@ class FC:
         def value(ob):
             return sess.run(v0, {X: ob})
 
+        self.a = a0
+        self.v = v0
         self.X = X
+        self.neg_log_p = neg_log_p
         self.pi = pi
         self.vf = vf
         self.step = step
@@ -102,7 +107,7 @@ class FC:
 
 
 class CNN:
-    def __init__(self, sess, scope, ob_space, ac_space, batch_size, config, reuse=False):
+    def __init__(self, sess, scope, ob_space, ac_space, batch_size, config):
         sample = get_sampler(config, ac_space, batch_size)
 
         #activation function
@@ -128,6 +133,7 @@ class CNN:
 
         # sampe an action given the policy
         a0 = sample(pi)
+        neg_log_p = categorical_neg_log_p(pi, a0, ac_space.n)
 
         def step(ob):
             a, v = sess.run([a0, v0], {X: ob})
@@ -136,7 +142,10 @@ class CNN:
         def value(ob):
             return sess.run(v0, {X: ob})
 
+        self.a = a0
+        self.v = v0
         self.X = X
+        self.neg_log_p = neg_log_p
         self.pi = pi
         self.vf = vf
         self.step = step

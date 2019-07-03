@@ -3,7 +3,7 @@ from baselines.common.tf_util import get_session
 import tensorflow as tf
 
 
-def train(config, env):
+def train(config, env, logger):
     session_config = tf.ConfigProto(
         allow_soft_placement=True,
         intra_op_parallelism_threads=1,
