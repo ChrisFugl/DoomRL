@@ -18,11 +18,11 @@ def train(config, env, logger):
         lr=config.learning_rate,
         alpha=config.rmsp_decay,
         gamma=config.discount_factor,
-        # batch size is nsteps * nenv where nenv is number of environment copies simulated in parallel
         nsteps=config.number_of_steps,
         epsilon=config.rmsp_epsilon,
         max_grad_norm=config.max_grad_norm,
         ent_coef=config.entropy_weight,
-        vf_coef=config.critic_weight
+        vf_coef=config.critic_weight,
+        log_interval=config.log_every
     )
     model.save(config.save_path)

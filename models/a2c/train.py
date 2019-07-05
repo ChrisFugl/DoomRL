@@ -27,6 +27,7 @@ def train(config, env, logger):
         timestep = 1
         while not config.stopping_criterion(timestep):
             obs, rewards, masks, actions, values, infos = runner.run()
+            rewards = rewards / config.reward_scale
             total_loss, policy_loss, value_loss, policy_entropy = model.train(obs, rewards, masks, actions, values)
             info_buffer.extend(infos)
 

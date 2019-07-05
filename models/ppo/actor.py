@@ -55,6 +55,9 @@ class Actor:
         batch_neg_log_p = np.asarray(batch_neg_log_p, dtype=neg_log_p.dtype)
         batch_dones = np.asarray(batch_dones, dtype=np.bool)
 
+        # downscale rewards
+        batch_rewards = batch_rewards / self.config.reward_scale
+
         # generalized advantage
         advantages = np.empty_like(batch_rewards)
         advantage = 0

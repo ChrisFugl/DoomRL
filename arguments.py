@@ -45,6 +45,7 @@ def parse_test_config():
     args.max_grad_norm = 0
     args.sampling_method = 'max'
     args.epsilon = 0
+    args.reward_scale = 1
 
     return args
 
@@ -77,7 +78,14 @@ def parse_train_config():
     parser.add('-sv', '--save_video', action='store_true', help='Save videos while training (default false).')
     parser.add('-ew', '--entropy_weight', required=False, type=float, default=0.01, help='Weight of entropy (default 0.01).')
     parser.add('-cw', '--critic_weight', required=False, type=float, default=0.5, help='Wegith of critic loss (default 0.5).')
-    parser.add('-mgn', '--max_grad_norm', required=False, type=float, default=None, help='Clips gradients at this norm or higher (default no clipping).')
+    parser.add(
+        '-mgn',
+        '--max_grad_norm',
+        required=False,
+        type=float,
+        default=None,
+        help='Clips gradients at this norm or higher (default no clipping).'
+    )
     parser.add(
         '-sm',
         '--sampling_method',
@@ -88,8 +96,16 @@ def parse_train_config():
     )
     parser.add('-ep', '--epsilon', required=False, type=float, default=0.1, help='Epsilon in greedy epsilon sampling (default 0.1).')
     parser.add('-le', '--log_every', required=False, type=int, default=100, help='Log every nth update (default 100).')
-    parser.add('-ce', '--clip_epsilon', required=False, default=0.2, help='Epsilon in clip in PPO (default 0.2).')
-    parser.add('-gael', '--gae_lambda', required=False, default=0.95, help='"Generalized Advantage Estimation" lambda (default 0.95).')
+    parser.add('-ce', '--clip_epsilon', required=False, type=float, default=0.2, help='Epsilon in clip in PPO (default 0.2).')
+    parser.add(
+        '-gael',
+        '--gae_lambda',
+        required=False,
+        type=float,
+        default=0.95,
+        help='"Generalized Advantage Estimation" lambda (default 0.95).'
+    )
+    parser.add('-rs', '--reward_scale', required=False, type=float, default=1, help='Downscale reward by a constant (default 1).')
     args = parser.parse_args()
     args.batch_size = args.number_of_steps * args.number_of_environments
     file_path = os.path.dirname(os.path.realpath(__file__))
