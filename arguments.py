@@ -1,15 +1,11 @@
 import configargparse
 import os
 
+_ALGORITHMS = ['baseline_a2c', 'baseline_acer', 'baseline_ppo', 'a2c', 'ppo']
 
 def parse_test_config():
     parser = configargparse.get_arg_parser()
-    parser.add(
-        '-a', '--algorithm',
-        choices=['baseline_a2c', 'baseline_ppo', 'a2c', 'ppo'],
-        required=True,
-        help='Algorithm to use. One of: baseline_a2c, a2c, baseline_ppo2.'
-    )
+    parser.add('-a', '--algorithm', choices=_ALGORITHMS, required=True, help='Which algorithm to use.')
     parser.add('-e', '--env', required=True, help='Name of Vizdoom environment. See README for a list of environment names.')
     parser.add('-n', '--name', required=True, help='Name of the model (as set during training).')
     parser.add('-o', '--out', required=True, help='Save path of experiments.')
@@ -28,36 +24,36 @@ def parse_test_config():
 
     # set dummy training variables that are needed to initialize models but will not actually be used
     args.timesteps = 0
-    args.learning_rate = 0
-    args.discount_factor = 0
+    args.learning_rate = 0.0
+    args.discount_factor = 0.0
     args.number_of_steps = 1
     args.number_of_environments = 1
     args.batch_size = 1
     args.mini_batch_size = 1
     args.epochs = 1
-    args.gae_lambda = 0
-    args.clip_epsilon = 0
-    args.momentum = 0
-    args.rmsp_decay = 0
-    args.rmsp_epsilon = 0
-    args.entropy_weight = 0
-    args.critic_weight = 0
-    args.max_grad_norm = 0
+    args.gae_lambda = 0.0
+    args.clip_epsilon = 0.0
+    args.momentum = 0.0
+    args.rmsp_decay = 0.0
+    args.rmsp_epsilon = 0.0
+    args.entropy_weight = 0.0
+    args.critic_weight = 0.0
+    args.max_grad_norm = 0.0
     args.sampling_method = 'max'
-    args.epsilon = 0
+    args.epsilon = 0.0
     args.reward_scale = 1
+    args.buffer_size = 1
+    args.replay_ratio = 1
+    args.replay_start = 1
+    args.clipping_factor = 1.0
+    args.trust_region_delta = 1
 
     return args
 
 
 def parse_train_config():
     parser = configargparse.get_arg_parser()
-    parser.add(
-        '-a', '--algorithm',
-        choices=['baseline_a2c', 'baseline_ppo', 'a2c', 'ppo'],
-        required=True,
-        help='Algorithm to use. One of: baseline_a2c, a2c, baseline_ppo2.'
-    )
+    parser.add('-a', '--algorithm', choices=_ALGORITHMS, required=True, help='Which algorithm to use.')
     parser.add('-e', '--env', required=True, help='Name of Vizdoom environment. See README for a list of environment names.')
     parser.add('-n', '--name', required=True, help='Name of experiment - used to generate log and output files.')
     parser.add('-t', '--timesteps', required=False, type=int, default=1000000, help='Number of timesteps (default 1 million)')
@@ -106,6 +102,11 @@ def parse_train_config():
         help='"Generalized Advantage Estimation" lambda (default 0.95).'
     )
     parser.add('-rs', '--reward_scale', required=False, type=float, default=1, help='Downscale reward by a constant (default 1).')
+    parser.add('-bs', '--buffer_size', required=False, type=int, default=50000, help='Replay buffer size (default 50000).')
+    parser.add('-rpr', '--replay_ratio', required=False, type=int, default=4, help='Replay ratio in ACER (default 4).')
+    parser.add('-rps', '--replay_start', required=False, type=int, default=10000, help='Replay start in ACER (default 10000).')
+    parser.add('-cf', '--clipping_factor', required=False, type=float, default=10, help='Clipping factor in ACER (default 10).')
+    parser.add('-trd', '--trust_region_delta', required=False, type=float, default=1, help='Trust region delta in ACER (default 1).')
     args = parser.parse_args()
     args.batch_size = args.number_of_steps * args.number_of_environments
     file_path = os.path.dirname(os.path.realpath(__file__))

@@ -16,6 +16,8 @@ def main():
     algorithm = config.algorithm
     if algorithm == 'baseline_a2c':
         from models.baselines.a2c import test
+    elif algorithm == 'baseline_acer':
+        from models.baselines.acer import test
     elif algorithm == 'baseline_ppo':
         from models.baselines.ppo import test
     elif algorithm == 'a2c':
