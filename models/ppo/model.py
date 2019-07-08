@@ -1,18 +1,18 @@
 from baselines.common.tf_util import initialize
 from models.network import CNN
-from models.utils import categorical_neg_log_p, entropy as get_entropy
+from models.utils import categorical_neg_log_p, entropy_logits
 import tensorflow as tf
 
 
 class Model:
 
-    def __init__(self, config, session, ob_space, ac_space):
+    def __init__(self, config, env, session):
         self.config = config
         self.session = session
-        self.ob_space = ob_space
-        self.ac_space = ac_space
-        self.actor_model = CNN(session, 'ppo', ob_space, ac_space, config.number_of_environments, config)
-        self.training_model = CNN(session, 'ppo', ob_space, ac_space, config.mini_batch_size, config)
+        self.ac_space = env.action_space
+        with tf.variable_scope('ppo', reuse=tf.AUTO_REUSE):
+            self.actor_model = CNN(config, env, session, config.number_of_environments)
+            self.training_model = CNN(config, env, session, config.batch_size)
         self.c1 = config.critic_weight
         self.c2 = config.entropy_weight
         self.clip = config.clip_epsilon
@@ -53,7 +53,7 @@ class Model:
         # compute loss
         pi = self.training_model.pi
         self.neg_log_p = categorical_neg_log_p(pi, self.actions, self.ac_space.n)
-        self.entropy = tf.reduce_mean(get_entropy(pi))
+        self.entropy = tf.reduce_mean(entropy_logits(pi))
 
         ratio = tf.exp(self.neg_log_p_old - self.neg_log_p)
         policy_loss_unclipped = - ratio * self.advantages

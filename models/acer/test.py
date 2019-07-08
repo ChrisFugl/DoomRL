@@ -1,5 +1,5 @@
 from baselines.common import tf_util
-from models.ppo.model import Model
+from models.acer.model import Model
 from models.utils import make_rollouts
 import tensorflow as tf
 

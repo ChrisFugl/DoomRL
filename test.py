@@ -22,6 +22,8 @@ def main():
         from models.baselines.ppo import test
     elif algorithm == 'a2c':
         from models.a2c import test
+    elif algorithm == 'acer':
+        from models.acer import test
     elif algorithm == 'ppo':
         from models.ppo import test
     else:

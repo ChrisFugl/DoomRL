@@ -10,7 +10,7 @@ def conv(inputs, nf, ks, strides, name, activ=None, gain=1.0):
         filters=nf,
         kernel_size=ks,
         strides=(strides, strides),
-        activation=None,
+        activation=activ,
         kernel_initializer=tf.orthogonal_initializer(gain=gain),
         name=name
     )
@@ -20,7 +20,7 @@ def fc(inputs, units, name, activ=None, gain=1.0):
     return tf.layers.dense(
         inputs=inputs,
         units=units,
-        activation=None,
+        activation=activ,
         kernel_initializer=tf.orthogonal_initializer(gain),
         name=name
     )
@@ -56,84 +56,47 @@ def sample_max(logits):
     return tf.argmax(logits, axis=-1)
 
 
-def get_sampler(config, ac_space, batch_size):
+def get_sampler(config, env, batch_size):
     if config.sampling_method == 'noise':
         return sample_noise
     elif config.sampling_method == 'categorical':
         return sample_categorical
     elif config.sampling_method == 'epsilon':
-        return sample_epsilon_greedy(config.epsilon, ac_space.n, batch_size)
+        return sample_epsilon_greedy(config.epsilon, env.action_space.n, batch_size)
     else:
         return sample_max
 
 
-class FC:
-    def __init__(self, sess, scope, ob_space, ac_space, batch_size, config):
-        sample = get_sampler(config, ac_space, batch_size)
-
-        #activation function
-        activ = tf.nn.relu
-
-        #input shapes
-        X = tf.placeholder(tf.float32, [batch_size, ob_space.shape[0]])
-        with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-            h1 = fc(X, 32, name='fc1', activ=activ, gain=np.sqrt(2))
-            h2 = fc(X, 32, name='fc2', activ=activ, gain=np.sqrt(2))
-            pi = fc(h2, ac_space.n, name="pi", activ=None)
-            vf = fc(h2, 1, name="vf", activ=None)
-
-        # value prediction
-        v0 = vf[:, 0]
-
-        # sampe an action given the policy
-        a0 = sample(pi)
-        neg_log_p = categorical_neg_log_p(pi, a0, ac_space.n)
-
-        def step(ob):
-            a, v = sess.run([a0, v0], {X: ob})
-            return a, v
-
-        def value(ob):
-            return sess.run(v0, {X: ob})
-
-        self.a = a0
-        self.v = v0
-        self.X = X
-        self.neg_log_p = neg_log_p
-        self.pi = pi
-        self.vf = vf
-        self.step = step
-        self.value = value
-
-
 class CNN:
-    def __init__(self, sess, scope, ob_space, ac_space, batch_size, config):
-        sample = get_sampler(config, ac_space, batch_size)
 
-        #activation function
+    def __init__(self, config, env, session, batch_size):
+        sample = get_sampler(config, env, batch_size)
+        n_actions = env.action_space.n
+
+        # activation function
         activ = tf.nn.relu
 
-        nh, nw, nc = ob_space.shape
+        nh, nw, nc = env.observation_space.shape
         X = tf.placeholder(tf.float32, [batch_size, nh, nw, nc])
 
-        #sclae the images
-        scaled_images = tf.cast(X, tf.float32) / 255.
+        # scale the images
+        scaled_images = tf.cast(X, tf.float32) / 255.0
 
-        with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-            h1 = conv(scaled_images, nf=32, ks=8, strides=4, name='c1', activ=activ, gain=np.sqrt(2))
-            h2 = conv(h1, nf=64, ks=4, strides=2, name='c2', activ=activ, gain=np.sqrt(2))
-            h3 = conv(h2, nf=64, ks=3, strides=1, name='c3', activ=activ, gain=np.sqrt(2))
-            h3 = conv_to_fc(h3)
-            h4 = fc(h3, 512, name='fc1', activ=activ, gain=np.sqrt(2))
-            pi = fc(h4, ac_space.n, name="pi", activ=None)
-            vf = fc(h4, 1, name="vf", activ=None)
+        h1 = conv(scaled_images, nf=32, ks=8, strides=4, name='c1', activ=activ, gain=np.sqrt(2))
+        h2 = conv(h1, nf=64, ks=4, strides=2, name='c2', activ=activ, gain=np.sqrt(2))
+        h3 = conv(h2, nf=64, ks=3, strides=1, name='c3', activ=activ, gain=np.sqrt(2))
+        h3 = conv_to_fc(h3)
+        h4 = fc(h3, 512, name='fc1', activ=activ, gain=np.sqrt(2))
+        pi = fc(h4, n_actions, name="pi", activ=None)
+        vf = fc(h4, 1, name="vf", activ=None)
+        q = fc(h4, n_actions, name='q', activ=None)
 
         # value prediction
         v0 = vf[:, 0]
 
-        # sampe an action given the policy
+        # sample an action given the policy
         a0 = sample(pi)
-        neg_log_p = categorical_neg_log_p(pi, a0, ac_space.n)
+        neg_log_p = categorical_neg_log_p(pi, a0, n_actions)
 
         def step(ob):
             a, v = sess.run([a0, v0], {X: ob})
@@ -147,6 +110,7 @@ class CNN:
         self.X = X
         self.neg_log_p = neg_log_p
         self.pi = pi
+        self.q = q
         self.vf = vf
         self.step = step
         self.value = value

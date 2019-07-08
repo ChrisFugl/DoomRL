@@ -24,6 +24,8 @@ def main():
         from models.baselines.ppo import train
     elif algorithm == 'a2c':
         from models.a2c import train
+    elif algorithm == 'acer':
+        from models.acer import train
     elif algorithm == 'ppo':
         from models.ppo import train
     else:

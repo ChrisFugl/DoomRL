@@ -16,7 +16,7 @@ def train(config, env, logger):
         gpu_options=gpu_opts,
     )
     with tf.Session(config=tf_config) as session:
-        model = Model(config, session, env.observation_space, env.action_space)
+        model = Model(config, env, session)
         actor = Actor(config, env, model)
         info_buffer = deque(maxlen=100)
         update = 1
@@ -48,14 +48,7 @@ def train(config, env, logger):
                 seconds = time.time() - tstart
                 fps = timestep // seconds
                 losses = np.mean(mb_losses, axis=0)
-                logger.start_summary()
-                logger.add_infos(info_buffer)
-                logger.add_value('model/fps', fps)
-                logger.add_value('model/total_loss', losses[0])
-                logger.add_value('model/policy_loss', losses[1])
-                logger.add_value('model/value_loss', losses[2])
-                logger.add_value('model/entropy', losses[3])
-                logger.log_summary(timestep)
+                logger.summary(timestep, fps, info_buffer, losses[0], losses[1], losses[2], losses[3])
 
             update += 1
             timestep += config.batch_size

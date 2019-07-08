@@ -63,7 +63,7 @@ def safe_mean(xs):
     return np.nan if len(xs) == 0 else np.mean(xs)
 
 
-def entropy(logits):
+def entropy_logits(logits):
     '''
     See: https://github.com/openai/baselines/blob/master/baselines/common/distributions.py
     '''
@@ -72,6 +72,10 @@ def entropy(logits):
     z0 = tf.reduce_sum(ea0, -1, keepdims=True)
     p0 = ea0 / z0
     return tf.reduce_sum(p0 * (tf.log(z0) - a0), -1)
+
+
+def entropy_probits(probits):
+    return - tf.reduce_sum(probits * tf.log(probits + 1e-10), axis=-1)
 
 
 def categorical_neg_log_p(logits, actions, n_actions):

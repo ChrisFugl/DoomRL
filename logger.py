@@ -7,7 +7,7 @@ class Logger:
 
     def __init__(self, tb_path):
         os.makedirs(tb_path, exist_ok=True)
-        self.writer = tf.summary.FileWriter(tb_path)
+        self._writer = tf.summary.FileWriter(tb_path)
 
     def add_infos(self, info_buffer):
         self._add_to_summary('episode_means', 'reward', safe_mean([info['reward'] for info in info_buffer]))
@@ -29,14 +29,24 @@ class Logger:
         self._add_to_summary('game_variables', 'kills', safe_mean([info['kills'] for info in info_buffer]))
 
     def add_value(self, key, value):
-        self.summary.value.add(tag=key, simple_value=value)
+        self._summary.value.add(tag=key, simple_value=value)
 
     def start_summary(self):
-        self.summary = tf.Summary()
+        self._summary = tf.Summary()
 
     def log_summary(self, timestep):
-        self.writer.add_summary(self.summary, timestep)
-        self.writer.flush()
+        self._writer.add_summary(self._summary, timestep)
+        self._writer.flush()
+
+    def summary(self, timestep, fps, info_buffer, total_loss, policy_loss, value_loss, entropy):
+        self.start_summary()
+        self.add_infos(info_buffer)
+        self.add_value('model/fps', fps)
+        self.add_value('model/total_loss', total_loss)
+        self.add_value('model/policy_loss', policy_loss)
+        self.add_value('model/value_loss', value_loss)
+        self.add_value('model/entropy', entropy)
+        self.log_summary(timestep)
 
     def _add_to_summary(self, scope, name, value):
-        self.summary.value.add(tag=f'{scope}/{name}', simple_value=value)
+        self._summary.value.add(tag=f'{scope}/{name}', simple_value=value)

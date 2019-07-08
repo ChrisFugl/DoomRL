@@ -1,5 +1,5 @@
 from models.network import CNN
-from models.utils import categorical_neg_log_p, entropy as get_entropy
+from models.utils import categorical_neg_log_p, entropy_logits
 import tensorflow as tf
 
 
@@ -7,7 +7,8 @@ import tensorflow as tf
 class used to initialize the sample_net (sampling) and train_net (training)
 '''
 class Model:
-    def __init__(self, sess, ob_space, ac_space, config):
+
+    def __init__(self, config, env, sess):
         self.sess = sess
         self.learning_rate = config.learning_rate
         self.ac_space = ac_space
@@ -16,13 +17,14 @@ class Model:
         adv_ph = tf.placeholder(shape=[config.batch_size], name='adv', dtype=tf.float32)
         rew_ph = tf.placeholder(shape=[config.batch_size], name='rew', dtype=tf.float32)
 
-        sample_net = CNN(sess, 'a2c', ob_space, ac_space, config.number_of_environments, config)
-        train_net = CNN(sess, 'a2c', ob_space, ac_space, config.batch_size, config)
+        with tf.variable_scope('a2c', reuse=tf.AUTO_REUSE):
+            sample_net = CNN(config, env, sess, config.number_of_environments)
+            train_net = CNN(config, env, sess, config.batch_size)
 
         # actor
         neglogprob = categorical_neg_log_p(train_net.pi, act_ph, ac_space.n)
         actor_loss = tf.reduce_mean(neglogprob * adv_ph)
-        entropy = tf.reduce_mean(get_entropy(train_net.pi))
+        entropy = tf.reduce_mean(entropy_logits(train_net.pi))
 
         # value
         value_loss = tf.losses.mean_squared_error(tf.squeeze(train_net.vf), tf.squeeze(rew_ph))
