@@ -2,4 +2,4 @@ ConfigArgParse==0.14.0
 gym==0.12.5
 numpy==1.16.1
 pandas==0.24.2
-tensorflow==1.12.1
+tensorflow==2.9.3
